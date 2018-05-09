@@ -84,6 +84,10 @@ my_bool wsrep_restart_slave_activated  = 0; // node has dropped, and slave
                                             // restart will be needed
 my_bool wsrep_slave_UK_checks          = 0; // slave thread does UK checks
 my_bool wsrep_slave_FK_checks          = 0; // slave thread does FK checks
+ulong   wsrep_RSU_commit_timeout       = 5000; // wait for x micr-secs
+                                               // to allow active connection to
+                                               // commit before starting RSU.
+
 
 /* pxc-strict-mode help control behavior of experimental features like
 myisam table replication, etc... */
@@ -2088,7 +2092,7 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
                " for schema: %s, query: %s",
                ret, (thd->db().str ? thd->db().str : "(null)"), WSREP_QUERY(thd));
     my_error(ER_LOCK_DEADLOCK, MYF(0));
-    return(ret);
+    return(-1);
   }
 
   mysql_mutex_lock(&LOCK_wsrep_replaying);
@@ -2113,7 +2117,7 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
     }
 
     my_error(ER_LOCK_DEADLOCK, MYF(0));
-    return(1);
+    return(-1);
   }
 
   seqno = wsrep->pause(wsrep);
@@ -2125,7 +2129,7 @@ static int wsrep_RSU_begin(THD *thd, const char *db_, const char *table_)
     /* Pause fail so rollback desync action too. */
     wsrep->resync(wsrep);
 
-    return(1);
+    return(-1);
   }
   thd->global_read_lock.pause_provider(true);
   WSREP_DEBUG("Provider paused for RSU processing at seqno: %lld",
